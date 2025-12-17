@@ -13,43 +13,66 @@ LIMITS = {
     "utm_source": 10,
     "campaign_name": 50,
     "utm_content": 20,
+    "format": 25,
+    "audience": 25,
 }
 
 # ========= MODALITÀ (CRM / Media / Social / Dealer) =========
-# Decide quali parametri includere (e quali campi mostrare).
 CHANNELS = {
     "CRM": {
-        "include": ["campaignName", "wtl_source"],  # tipico CRM tracking
-        "allow_utm": False,
+        "include": ["campaignName", "wtl_source"],
+        "allow_media_builder": False,
     },
     "Media": {
         "include": ["campaignName", "wtl_source", "utm_source", "utm_medium", "utm_campaign", "utm_content"],
-        "allow_utm": True,
+        "allow_media_builder": True,
     },
     "Social": {
         "include": ["campaignName", "wtl_source", "utm_source", "utm_medium", "utm_campaign", "utm_content"],
-        "allow_utm": True,
+        "allow_media_builder": True,
     },
     "Dealer": {
         "include": ["campaignName", "wtl_source", "utm_source", "utm_medium", "utm_campaign", "utm_content"],
-        "allow_utm": True,
+        "allow_media_builder": True,
     },
 }
 
 # ========= DROPDOWNS =========
+# utm_medium (no spazi)
 UTM_MEDIUM = ["paid-search", "display", "email", "paid-social", "social-owned", "qr-code"]
+
+# Type-medium (canale media per scegliere format/audience)
+TYPE_MEDIUM = ["Display", "Video", "Paid Search", "Paid Social"]
+
+# Type-source (di fatto utm_source)
 UTM_SOURCE = ["newsletter", "facebook", "google", "instagram", "pinterest", "linkedin", "tiktok", "youtube"]
 
+# UTM content minimale (se vuoi reintrodurre targeting aw/cns/cnv + prs/rtg/geo lo facciamo dopo)
 PHASE = {"Awareness": "aw", "Consideration": "cns", "Conversion": "cnv"}
-TARGETING = {"Prospecting": "prs", "Retargeting": "rtg", "Geolocal": "geo"}
 
-# Modelli e motorizzazioni BLOCCATI (esempi: sostituisci con le tue liste ufficiali)
+# Modelli/motorizzazioni bloccati (sostituisci con liste ufficiali)
 MODELS_ENGINES = {
     "grecale": ["mhev", "bev", "phev"],
     "granturismo": ["bev", "ice"],
     "ghibli": ["ice", "mhev"],
     "levante": ["ice", "mhev"],
     "mc20": ["ice"],
+}
+
+# ========= FORMAT (colonna "Format Reviewed") =========
+FORMAT_BY_MEDIUM = {
+    "Display": ["Standard", "Native", "Skin", "Interstitial"],
+    "Video": ["Non-Skippable", "Skippable", "Bumper", "Short", "In-feed", "Masthead"],
+    "Paid Search": ["Demand Gen", "Search Ad", "Pmax"],
+    "Paid Social": ["Static Feed Ad", "Video Feed Ad", "Sponsered Content Ad", "Stories", "Reels", "Inmail"],
+}
+
+# ========= AUDIENCE (targeting) =========
+AUDIENCE_BY_MEDIUM = {
+    "Display": ["Prospecting", "Retargeting", "Look a Like"],
+    "Video": ["Prospecting", "Retargeting", "Look a Like"],
+    "Paid Search": ["Prospecting", "Retargeting", "Look a Like", "Mix"],
+    "Paid Social": ["Prospecting", "Retargeting", "Look a Like", "Advantage plus audience"],
 }
 
 # ========= HELPERS =========
@@ -86,18 +109,16 @@ def merge_query_params(url: str, new_params: dict) -> str:
     return urlunparse(p._replace(query=urlencode(q, doseq=True)))
 
 # ========= UI =========
-st.set_page_config(page_title="UTM Builder (Compliant)", layout="wide")
-st.title("UTM Builder (Compliant)")
+st.set_page_config(page_title="UTM Builder (Compliant + Format/Audience)", layout="wide")
+st.title("UTM Builder (Compliant + Format/Audience)")
 
 with st.sidebar:
     st.header("Impostazioni")
     sep = st.selectbox("Separatore", ["_", "-"], index=0)
-    channel = st.selectbox("Tipo attività", list(CHANNELS.keys()), index=1)  # default Media
+    mode = st.selectbox("Modalità", list(CHANNELS.keys()), index=1)  # Media default
 
-st.info(
-    f"Modalità selezionata: **{channel}**. "
-    "Il tool includerà automaticamente solo i parametri previsti per questo caso."
-)
+allow_media_builder = CHANNELS[mode]["allow_media_builder"]
+st.info(f"Modalità: **{mode}**")
 
 # ---- Salesforce block ----
 st.subheader("Salesforce (tracking base)")
@@ -105,7 +126,7 @@ sf_campaign_id_raw = st.text_input("Salesforce Campaign ID (15 caratteri)", plac
 wtl_source_value = sf_campaign_id_raw.strip()
 st.text_input("WTL Source (auto = SF Campaign ID)", value=wtl_source_value, disabled=True)
 
-# ---- Modello / Motorizzazione (dropdown bloccati) ----
+# ---- Vehicle (bloccato) ----
 st.subheader("Veicolo")
 m1, m2 = st.columns(2)
 with m1:
@@ -113,53 +134,52 @@ with m1:
 with m2:
     engine = st.selectbox("Motorizzazione", MODELS_ENGINES.get(model, []))
 
-# ---- Adobe/UTM (solo se la modalità lo permette) ----
-allow_utm = CHANNELS[channel]["allow_utm"]
+# ---- Media Builder fields (solo in modalità allow_media_builder) ----
+if allow_media_builder:
+    st.subheader("UTM Builder Media (campi guidati)")
 
-if allow_utm:
-    st.subheader("Adobe / UTM")
     c1, c2, c3 = st.columns(3)
     with c1:
-        utm_medium = st.selectbox("utm_medium", UTM_MEDIUM)
+        type_medium = st.selectbox("Type-medium", TYPE_MEDIUM)
     with c2:
-        utm_source = st.selectbox("utm_source", UTM_SOURCE)
+        type_source = st.selectbox("Type-source", UTM_SOURCE)  # usato anche come utm_source
     with c3:
-        yyyymm = st.text_input("Year_Month (YYYYMM)", value=yyyymm_now())
+        utm_medium = st.selectbox("utm_medium", UTM_MEDIUM)
+
+    f1, f2 = st.columns(2)
+    with f1:
+        format_val = st.selectbox("Format", FORMAT_BY_MEDIUM.get(type_medium, ["N/A"]))
+    with f2:
+        audience_val = st.selectbox("Audience", AUDIENCE_BY_MEDIUM.get(type_medium, ["N/A"]))
 else:
-    # valori placeholder (non usati)
-    utm_medium, utm_source, yyyymm = "", "", yyyymm_now()
+    type_medium = ""
+    type_source = ""
+    utm_medium = ""
+    format_val = ""
+    audience_val = ""
 
-# ---- Campaign Name (unico) ----
+# ---- Campaign name inputs ----
 st.subheader("Campaign Name (unico cross-platform)")
-st.caption("Verrà usato sia come campaignName (SF) sia come utm_campaign (Adobe), quando previsto.")
 
-# componenti “guidati” ma con campi controllati dove serve
 a1, a2, a3, a4 = st.columns(4)
-with a1: dept_region = st.text_input("Dept/Region", placeholder="es. hq_crm")
-with a2: camp_short = st.text_input("Campaign short name", placeholder="es. dstck")
-with a3: activity = st.text_input("Activity type", placeholder="es. td")
+with a1: region_dept = st.text_input("Region/Dept", placeholder="es. hq")
+with a2: camp_short = st.text_input("Name", placeholder="es. dstck")
+with a3: activity = st.text_input("Activity type (objective)", placeholder="es. td")
 with a4: country = st.text_input("Country", placeholder="es. it")
 
 b1, b2 = st.columns(2)
 with b1: language = st.text_input("Language", placeholder="it / multil")
-with b2: comm_type = st.text_input("Communication type", placeholder="edm / nl / push")
+with b2: yyyymm = st.text_input("Year_Month (YYYYMM)", value=yyyymm_now())
+
+if allow_media_builder:
+    st.subheader("UTM_CONTENT (minimo)")
+    phase = st.selectbox("Campaign phase", list(PHASE.keys()))
+else:
+    phase = "Awareness"
 
 campaign_manual = st.text_input("Override campaign name (opzionale)")
 
-# ---- UTM_CONTENT (solo se UTM) ----
-if allow_utm:
-    st.subheader("UTM_CONTENT (phase + targeting + opzionale asset)")
-    cc1, cc2, cc3 = st.columns(3)
-    with cc1:
-        phase = st.selectbox("Campaign phase", list(PHASE.keys()))
-    with cc2:
-        targeting = st.selectbox("Targeting type", list(TARGETING.keys()))
-    with cc3:
-        asset_ref = st.text_input("Asset ref (opzionale)", placeholder="es. crea1a / 300x250 / v2")
-else:
-    phase, targeting, asset_ref = "Awareness", "Prospecting", ""
-
-# ---- URL input ----
+# ---- URLs ----
 st.subheader("URL (uno per riga)")
 urls_text = st.text_area("Incolla qui gli URL", height=160)
 
@@ -176,12 +196,12 @@ if st.button("Genera"):
             wtl_source = sf_campaign_id
             enforce_max_len("WTL Source", wtl_source, LIMITS["wtl_source"])
 
-            # Campaign name (unico)
+            # Build campaign name
             if campaign_manual.strip():
                 campaign_name = slugify(campaign_manual, sep=sep)
             else:
                 parts = [
-                    slugify(dept_region, sep=sep),
+                    slugify(region_dept, sep=sep),
                     slugify(camp_short, sep=sep),
                     slugify(activity, sep=sep),
                     slugify(country, sep=sep),
@@ -189,52 +209,64 @@ if st.button("Genera"):
                     slugify(language, sep=sep),
                     slugify(model, sep=sep),
                     slugify(engine, sep=sep),
-                    slugify(comm_type, sep=sep),
                 ]
-                parts = [p for p in parts if p]
+
+                # ---- Media enrichment: AFTER type-source add format + audience ----
+                if allow_media_builder:
+                    fmt = slugify(format_val, sep=sep)
+                    aud = slugify(audience_val, sep=sep)
+                    enforce_max_len("Format", fmt, LIMITS["format"])
+                    enforce_max_len("Audience", aud, LIMITS["audience"])
+
+                    parts.extend([
+                        slugify(type_medium, sep=sep),
+                        slugify(type_source, sep=sep),  # Type-source
+                        fmt,                             # NEW: Format (after type-source)
+                        aud,                             # NEW: Audience (after type-source)
+                    ])
+
+                parts = [p for p in parts if p and p != "n_a"]
                 campaign_name = sep.join(parts)
 
             enforce_max_len("Campaign name", campaign_name, LIMITS["campaign_name"])
 
-            # Base params (sempre)
+            # UTM content minimale
+            utm_content = slugify(PHASE[phase], sep=sep)
+            enforce_max_len("utm_content", utm_content, LIMITS["utm_content"])
+
+            # Params base (sempre)
             params_all = {
                 "campaignName": campaign_name,
                 "wtl_source": wtl_source,
             }
 
-            # UTM params (solo se previsto per la modalità)
-            if allow_utm:
-                utm_source_clean = slugify(utm_source, sep=sep)
+            # UTM params only if in media modes
+            if allow_media_builder:
+                utm_source_clean = slugify(type_source, sep=sep)  # type-source = utm_source
                 utm_medium_clean = slugify(utm_medium, sep=sep)
+
                 enforce_max_len("utm_source", utm_source_clean, LIMITS["utm_source"])
                 enforce_max_len("utm_medium", utm_medium_clean, LIMITS["utm_medium"])
-
-                content_parts = [PHASE[phase], TARGETING[targeting]]
-                if asset_ref.strip():
-                    content_parts.append(slugify(asset_ref, sep=sep))
-                utm_content = sep.join(content_parts)
-                enforce_max_len("utm_content", utm_content, LIMITS["utm_content"])
 
                 params_all.update({
                     "utm_source": utm_source_clean,
                     "utm_medium": utm_medium_clean,
-                    "utm_campaign": campaign_name,   # stesso valore di campaignName
+                    "utm_campaign": campaign_name,
                     "utm_content": utm_content,
                 })
 
-            # Filtra SOLO i parametri previsti per la modalità
-            include_keys = set(CHANNELS[channel]["include"])
+            # Filter by mode
+            include_keys = set(CHANNELS[mode]["include"])
             params = {k: v for k, v in params_all.items() if k in include_keys}
 
             out = merge_query_params(u, params)
-            rows.append({"Tipo": channel, "URL originale": u, "URL con tracking": out})
+            rows.append({"Modalità": mode, "URL originale": u, "URL con tracking": out})
 
         except Exception as e:
-            rows.append({"Tipo": channel, "URL originale": u, "URL con tracking": f"ERRORE: {e}"})
+            rows.append({"Modalità": mode, "URL originale": u, "URL con tracking": f"ERRORE: {e}"})
 
     df = pd.DataFrame(rows)
     st.dataframe(df, use_container_width=True)
-
     st.download_button(
         "Scarica CSV",
         data=df.to_csv(index=False).encode("utf-8"),
