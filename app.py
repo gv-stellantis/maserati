@@ -5,7 +5,6 @@ import re
 import unicodedata
 from datetime import datetime
 
-# ========= LIMITS (from guide) =========
 LIMITS = {
     "sf_campaign_id": 15,
     "wtl_source": 15,
@@ -17,41 +16,22 @@ LIMITS = {
     "audience": 25,
 }
 
-# ========= MODES (CRM / Media / Social / Dealer) =========
 MODES = {
-    "CRM": {
-        "include": ["campaignName", "wtl_source"],
-        "allow_media_builder": False,
-    },
-    "Media": {
-        "include": ["campaignName", "wtl_source", "utm_source", "utm_medium", "utm_campaign", "utm_content"],
-        "allow_media_builder": True,
-    },
-    "Social": {
-        "include": ["campaignName", "wtl_source", "utm_source", "utm_medium", "utm_campaign", "utm_content"],
-        "allow_media_builder": True,
-    },
-    "Dealer": {
-        "include": ["campaignName", "wtl_source", "utm_source", "utm_medium", "utm_campaign", "utm_content"],
-        "allow_media_builder": True,
-    },
+    "CRM": {"include": ["campaignName", "wtl_source"], "allow_media_builder": False},
+    "Media": {"include": ["campaignName", "wtl_source", "utm_source", "utm_medium", "utm_campaign", "utm_content"], "allow_media_builder": True},
+    "Social": {"include": ["campaignName", "wtl_source", "utm_source", "utm_medium", "utm_campaign", "utm_content"], "allow_media_builder": True},
+    "Dealer": {"include": ["campaignName", "wtl_source", "utm_source", "utm_medium", "utm_campaign", "utm_content"], "allow_media_builder": True},
 }
 
-# ========= DROPDOWNS =========
-# utm_medium (no spaces)
+# UTM-only (kept separate)
 UTM_MEDIUM = ["paid-search", "display", "email", "paid-social", "social-owned", "qr-code"]
-
-# Type-medium (media channel for format/audience)
-TYPE_MEDIUM = ["Display", "Video", "Paid Search", "Paid Social"]
-
-# Type-source (also used as utm_source)
 UTM_SOURCE = ["newsletter", "facebook", "google", "instagram", "pinterest", "linkedin", "tiktok", "youtube"]
 
-# Minimal utm_content
+# Media details (not UTM)
+TYPE_MEDIUM = ["Display", "Video", "Paid Search", "Paid Social"]
+
 PHASE = {"Awareness": "aw", "Consideration": "cns", "Conversion": "cnv"}
 
-# ========= MODELS / ENGINES (locked tokens) =========
-# Display label -> token (exact output)
 MODEL_OPTIONS = [
     ("Grecale", "grecale"),
     ("GranTurismo", "granturismo"),
@@ -62,19 +42,15 @@ MODEL_OPTIONS = [
     ("MC Pura Cielo", "mcpura-cielo"),
 ]
 
-# Model token -> list of engine tokens
-# NOTE: replaced MHEV with BEV as requested
-MODEL_ENGINES = {
-    "grecale": ["bev", "phev"],
-    "granturismo": ["bev", "ice"],
-    "ghibli": ["ice", "bev"],   # was mhev -> bev
-    "levante": ["ice", "bev"],  # was mhev -> bev
+ENGINE_OPTIONS = [("ICE", "ice"), ("BEV", "bev")]
+
+MODEL_ALLOWED_ENGINES = {
     "mc20": ["ice"],
     "mcpura": ["ice"],
     "mcpura-cielo": ["ice"],
 }
 
-# ========= FORMAT (Format Reviewed) =========
+# Format/Audience by media channel
 FORMAT_BY_MEDIUM = {
     "Display": ["Standard", "Native", "Skin", "Interstitial"],
     "Video": ["Non-Skippable", "Skippable", "Bumper", "Short", "In-feed", "Masthead"],
@@ -82,7 +58,6 @@ FORMAT_BY_MEDIUM = {
     "Paid Social": ["Static Feed Ad", "Video Feed Ad", "Sponsered Content Ad", "Stories", "Reels", "Inmail"],
 }
 
-# ========= AUDIENCE (Targeting) =========
 AUDIENCE_BY_MEDIUM = {
     "Display": ["Prospecting", "Retargeting", "Look a Like"],
     "Video": ["Prospecting", "Retargeting", "Look a Like"],
@@ -90,14 +65,10 @@ AUDIENCE_BY_MEDIUM = {
     "Paid Social": ["Prospecting", "Retargeting", "Look a Like", "Advantage plus audience"],
 }
 
-# ========= HELPERS =========
 _slug_re = re.compile(r"[^a-z0-9]+", re.IGNORECASE)
 
 def strip_accents(s: str) -> str:
-    return "".join(
-        c for c in unicodedata.normalize("NFKD", s or "")
-        if not unicodedata.combining(c)
-    )
+    return "".join(c for c in unicodedata.normalize("NFKD", s or "") if not unicodedata.combining(c))
 
 def slugify(value: str, sep: str = "_") -> str:
     v = (value or "").strip()
@@ -123,60 +94,66 @@ def merge_query_params(url: str, new_params: dict) -> str:
     q.update({k: v for k, v in new_params.items() if v})
     return urlunparse(p._replace(query=urlencode(q, doseq=True)))
 
-# ========= UI =========
-st.set_page_config(page_title="UTM Builder (Compliant + Format/Audience)", layout="wide")
-st.title("UTM Builder (Compliant + Format/Audience)")
+st.set_page_config(page_title="UTM Builder (Compliant + Optional Media Details)", layout="wide")
+st.title("UTM Builder (Compliant + Optional Media Details)")
 
 with st.sidebar:
     st.header("Settings")
     sep = st.selectbox("Word separator", ["_", "-"], index=0)
-    mode = st.selectbox("Mode", list(MODES.keys()), index=1)  # Media default
+    mode = st.selectbox("Mode", list(MODES.keys()), index=1)
 
 allow_media_builder = MODES[mode]["allow_media_builder"]
 st.info(f"Current mode: **{mode}**")
 
-# ---- Salesforce block ----
 st.subheader("Salesforce (base tracking)")
 sf_campaign_id_raw = st.text_input("Salesforce Campaign ID (15 chars)", placeholder="e.g. 701D0000000v4Gf")
 wtl_source_value = sf_campaign_id_raw.strip()
 st.text_input("WTL Source (auto = SF Campaign ID)", value=wtl_source_value, disabled=True)
 
-# ---- Vehicle (locked) ----
 st.subheader("Vehicle")
 colA, colB = st.columns(2)
 with colA:
     model_label = st.selectbox("Model", [x[0] for x in MODEL_OPTIONS])
-    model_token = dict(MODEL_OPTIONS)[model_label]  # exact output token
+    model_token = dict(MODEL_OPTIONS)[model_label]
 with colB:
-    engine_token = st.selectbox("Engine", MODEL_ENGINES.get(model_token, []))
+    allowed = MODEL_ALLOWED_ENGINES.get(model_token, ["ice", "bev"])
+    engine_labels = [lbl for (lbl, tok) in ENGINE_OPTIONS if tok in allowed]
+    engine_label = st.selectbox("Engine", engine_labels)
+    engine_token = dict(ENGINE_OPTIONS)[engine_label]
 
-# ---- Media Builder fields (only if enabled) ----
+# ---- UTM params (kept separate) ----
 if allow_media_builder:
-    st.subheader("Media fields (guided)")
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        type_medium = st.selectbox("Type-medium", TYPE_MEDIUM)
-    with c2:
-        type_source = st.selectbox("Type-source", UTM_SOURCE)  # also utm_source
-    with c3:
+    st.subheader("UTM parameters")
+    u1, u2 = st.columns(2)
+    with u1:
+        utm_source = st.selectbox("utm_source", UTM_SOURCE)
+    with u2:
         utm_medium = st.selectbox("utm_medium", UTM_MEDIUM)
+else:
+    utm_source = ""
+    utm_medium = ""
 
-    f1, f2 = st.columns(2)
-    with f1:
-        format_val = st.selectbox("Format", FORMAT_BY_MEDIUM.get(type_medium, ["N/A"]))
-    with f2:
-        audience_val = st.selectbox("Audience", AUDIENCE_BY_MEDIUM.get(type_medium, ["N/A"]))
+# ---- Media details (optional fields, first option empty) ----
+if allow_media_builder:
+    st.subheader("Media details (optional)")
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        type_medium = st.selectbox("Type-medium", TYPE_MEDIUM)
+
+    # first option empty
+    format_options = [""] + FORMAT_BY_MEDIUM.get(type_medium, [])
+    audience_options = [""] + AUDIENCE_BY_MEDIUM.get(type_medium, [])
+
+    with m2:
+        format_val = st.selectbox("Format (optional)", format_options, index=0)
+    with m3:
+        audience_val = st.selectbox("Audience (optional)", audience_options, index=0)
 else:
     type_medium = ""
-    type_source = ""
-    utm_medium = ""
     format_val = ""
     audience_val = ""
 
-# ---- Campaign name inputs ----
 st.subheader("Campaign Name (unique cross-platform)")
-
 a1, a2, a3, a4 = st.columns(4)
 with a1: region_dept = st.text_input("Region/Dept", placeholder="e.g. hq")
 with a2: camp_short = st.text_input("Name", placeholder="e.g. dstck")
@@ -195,18 +172,15 @@ else:
 
 campaign_manual = st.text_input("Override campaign name (optional)")
 
-# ---- URLs ----
 st.subheader("URLs (one per line)")
 urls_text = st.text_area("Paste URLs here", height=160)
 
-# ========= GENERATION =========
 if st.button("Generate"):
     urls = [u.strip() for u in urls_text.splitlines() if u.strip()]
     rows = []
 
     for u in urls:
         try:
-            # Salesforce ID + WTL source
             sf_campaign_id = sf_campaign_id_raw.strip()
             enforce_max_len("Salesforce Campaign ID", sf_campaign_id, LIMITS["sf_campaign_id"])
             wtl_source = sf_campaign_id
@@ -223,47 +197,38 @@ if st.button("Generate"):
                     slugify(country, sep=sep),
                     slugify(yyyymm, sep=sep),
                     slugify(language, sep=sep),
-
-                    # IMPORTANT: model token must be exact (mcpura / mcpura-cielo), so we do not slugify it
-                    model_token,
-                    # engine token is already controlled, keep as-is
-                    engine_token,
+                    model_token,     # exact token
+                    engine_token,    # ice/bev
                 ]
 
-                # ---- Media enrichment: AFTER type-source add format + audience ----
+                # Only append media details IF selected (non-empty)
+                # Also keep utm_source/utm_medium separated: they do NOT drive these parts.
                 if allow_media_builder:
-                    fmt = slugify(format_val, sep=sep)
-                    aud = slugify(audience_val, sep=sep)
-                    enforce_max_len("Format", fmt, LIMITS["format"])
-                    enforce_max_len("Audience", aud, LIMITS["audience"])
-
-                    parts.extend([
-                        slugify(type_medium, sep=sep),
-                        slugify(type_source, sep=sep),  # Type-source
-                        fmt,                             # Format (after type-source)
-                        aud,                             # Audience (after type-source)
-                    ])
+                    if format_val:
+                        fmt = slugify(format_val, sep=sep)
+                        enforce_max_len("Format", fmt, LIMITS["format"])
+                        parts.append(fmt)
+                    if audience_val:
+                        aud = slugify(audience_val, sep=sep)
+                        enforce_max_len("Audience", aud, LIMITS["audience"])
+                        parts.append(aud)
 
                 parts = [p for p in parts if p and p != "n_a"]
                 campaign_name = sep.join(parts)
 
             enforce_max_len("Campaign name", campaign_name, LIMITS["campaign_name"])
 
-            # Minimal utm_content
             utm_content = slugify(PHASE[phase], sep=sep)
             enforce_max_len("utm_content", utm_content, LIMITS["utm_content"])
 
-            # Params base (always)
             params_all = {
                 "campaignName": campaign_name,
                 "wtl_source": wtl_source,
             }
 
-            # UTM params only if media modes
             if allow_media_builder:
-                utm_source_clean = slugify(type_source, sep=sep)  # type-source = utm_source
+                utm_source_clean = slugify(utm_source, sep=sep)
                 utm_medium_clean = slugify(utm_medium, sep=sep)
-
                 enforce_max_len("utm_source", utm_source_clean, LIMITS["utm_source"])
                 enforce_max_len("utm_medium", utm_medium_clean, LIMITS["utm_medium"])
 
@@ -274,7 +239,6 @@ if st.button("Generate"):
                     "utm_content": utm_content,
                 })
 
-            # Filter by mode
             include_keys = set(MODES[mode]["include"])
             params = {k: v for k, v in params_all.items() if k in include_keys}
 
