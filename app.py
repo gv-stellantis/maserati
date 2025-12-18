@@ -32,7 +32,11 @@ TYPE_MEDIUM = ["Display", "Video", "Paid Search", "Paid Social"]
 
 PHASE = {"Awareness": "aw", "Consideration": "cns", "Conversion": "cnv"}
 
+# Model label -> token (exact output)
+# First entry "" to make the first option empty
 MODEL_OPTIONS = [
+    ("", ""),  # empty first option
+    ("Multi Model", "multim"),
     ("Grecale", "grecale"),
     ("GranTurismo", "granturismo"),
     ("Ghibli", "ghibli"),
@@ -42,15 +46,21 @@ MODEL_OPTIONS = [
     ("MC Pura Cielo", "mcpura-cielo"),
 ]
 
-ENGINE_OPTIONS = [("ICE", "ice"), ("BEV", "bev")]
+# Engine label -> token (ONLY ICE / BEV) with empty first option
+ENGINE_OPTIONS = [
+    ("", ""),  # empty first option
+    ("ICE", "ice"),
+    ("BEV", "bev"),
+]
 
+# Optional: restrict allowed engines per model
+# (Multi Model will default to both)
 MODEL_ALLOWED_ENGINES = {
     "mc20": ["ice"],
     "mcpura": ["ice"],
     "mcpura-cielo": ["ice"],
 }
 
-# Format/Audience by media channel
 FORMAT_BY_MEDIUM = {
     "Display": ["Standard", "Native", "Skin", "Interstitial"],
     "Video": ["Non-Skippable", "Skippable", "Bumper", "Short", "In-feed", "Masthead"],
@@ -110,18 +120,30 @@ sf_campaign_id_raw = st.text_input("Salesforce Campaign ID (15 chars)", placehol
 wtl_source_value = sf_campaign_id_raw.strip()
 st.text_input("WTL Source (auto = SF Campaign ID)", value=wtl_source_value, disabled=True)
 
+# ---- Vehicle (first option empty) ----
 st.subheader("Vehicle")
 colA, colB = st.columns(2)
-with colA:
-    model_label = st.selectbox("Model", [x[0] for x in MODEL_OPTIONS])
-    model_token = dict(MODEL_OPTIONS)[model_label]
-with colB:
-    allowed = MODEL_ALLOWED_ENGINES.get(model_token, ["ice", "bev"])
-    engine_labels = [lbl for (lbl, tok) in ENGINE_OPTIONS if tok in allowed]
-    engine_label = st.selectbox("Engine", engine_labels)
-    engine_token = dict(ENGINE_OPTIONS)[engine_label]
 
-# ---- UTM params (kept separate) ----
+model_map = dict(MODEL_OPTIONS)
+engine_map = dict(ENGINE_OPTIONS)
+
+with colA:
+    model_label = st.selectbox("Model", [x[0] for x in MODEL_OPTIONS], index=0)
+    model_token = model_map.get(model_label, "")
+
+with colB:
+    # Build allowed engines based on selected model token
+    if model_token:
+        allowed_tokens = MODEL_ALLOWED_ENGINES.get(model_token, ["ice", "bev"])
+    else:
+        # if model is empty, show only empty engine (forces user to pick model first)
+        allowed_tokens = []
+
+    engine_labels = [lbl for (lbl, tok) in ENGINE_OPTIONS if (tok in allowed_tokens) or (tok == "")]
+    engine_label = st.selectbox("Engine", engine_labels, index=0)
+    engine_token = engine_map.get(engine_label, "")
+
+# ---- UTM params (separate) ----
 if allow_media_builder:
     st.subheader("UTM parameters")
     u1, u2 = st.columns(2)
@@ -133,14 +155,13 @@ else:
     utm_source = ""
     utm_medium = ""
 
-# ---- Media details (optional fields, first option empty) ----
+# ---- Media details (optional, first option empty) ----
 if allow_media_builder:
     st.subheader("Media details (optional)")
     m1, m2, m3 = st.columns(3)
     with m1:
         type_medium = st.selectbox("Type-medium", TYPE_MEDIUM)
 
-    # first option empty
     format_options = [""] + FORMAT_BY_MEDIUM.get(type_medium, [])
     audience_options = [""] + AUDIENCE_BY_MEDIUM.get(type_medium, [])
 
@@ -186,7 +207,6 @@ if st.button("Generate"):
             wtl_source = sf_campaign_id
             enforce_max_len("WTL Source", wtl_source, LIMITS["wtl_source"])
 
-            # Build campaign name
             if campaign_manual.strip():
                 campaign_name = slugify(campaign_manual, sep=sep)
             else:
@@ -197,12 +217,15 @@ if st.button("Generate"):
                     slugify(country, sep=sep),
                     slugify(yyyymm, sep=sep),
                     slugify(language, sep=sep),
-                    model_token,     # exact token
-                    engine_token,    # ice/bev
                 ]
 
-                # Only append media details IF selected (non-empty)
-                # Also keep utm_source/utm_medium separated: they do NOT drive these parts.
+                # Only include model/engine if selected
+                if model_token:
+                    parts.append(model_token)  # exact token (multim, mcpura, mcpura-cielo)
+                if engine_token:
+                    parts.append(engine_token)  # ice / bev
+
+                # Only append media details IF selected
                 if allow_media_builder:
                     if format_val:
                         fmt = slugify(format_val, sep=sep)
