@@ -291,6 +291,21 @@ if st.button("Generate"):
     urls = [u.strip() for u in urls_text.splitlines() if u.strip()]
     rows = []
 
+    # ---- REQUIRED FIELD VALIDATION (before looping) ----
+    # wtl_source is mandatory => Salesforce Campaign ID mandatory
+    if not sf_campaign_id_raw.strip():
+        st.error("Salesforce Campaign ID is required (it also fills WTL Source).")
+        st.stop()
+
+    # In Media/Social/Dealer: utm_medium must be selected
+    if allow_media_builder and not utm_medium:
+        st.error("utm_medium is required in this mode.")
+        st.stop()
+
+    if not urls:
+        st.error("Please paste at least one URL.")
+        st.stop()
+
     for u in urls:
         try:
             sf_campaign_id = sf_campaign_id_raw.strip()
@@ -298,6 +313,7 @@ if st.button("Generate"):
             wtl_source = sf_campaign_id
             enforce_max_len("WTL Source", wtl_source, LIMITS["wtl_source"])
 
+            # Build campaign name (campaignName REQUIRED)
             if campaign_manual.strip():
                 campaign_name = slugify(campaign_manual, sep=sep)
             else:
@@ -310,13 +326,13 @@ if st.button("Generate"):
                     slugify(language, sep=sep),
                 ]
 
-                # Only include model/engine if selected
+                # Vehicle tokens (optional, only if selected)
                 if model_token:
                     parts.append(model_token)  # exact token (multim, mcpura, mcpura-cielo)
                 if engine_token:
                     parts.append(engine_token)  # ice / bev
 
-                # Only append media details IF selected
+                # Media details (optional)
                 if allow_media_builder:
                     if format_val:
                         fmt = slugify(format_val, sep=sep)
@@ -330,28 +346,46 @@ if st.button("Generate"):
                 parts = [p for p in parts if p and p != "n_a"]
                 campaign_name = sep.join(parts)
 
+            # campaignName REQUIRED
+            if not campaign_name.strip():
+                raise ValueError("campaignName is required (fill at least one campaign field or use Override campaign name).")
+
             enforce_max_len("Campaign name", campaign_name, LIMITS["campaign_name"])
 
+            # Minimal utm_content (optional but we keep it)
             utm_content = slugify(PHASE[phase], sep=sep)
             enforce_max_len("utm_content", utm_content, LIMITS["utm_content"])
 
+            # Params base (always)
             params_all = {
-                "campaignName": campaign_name,
-                "wtl_source": wtl_source,
+                "campaignName": campaign_name,  # REQUIRED
+                "wtl_source": wtl_source,       # REQUIRED
             }
 
+            # UTM params (required: utm_medium + utm_campaign in media modes)
             if allow_media_builder:
-                utm_source_clean = slugify(utm_source, sep=sep)
                 utm_medium_clean = slugify(utm_medium, sep=sep)
-                enforce_max_len("utm_source", utm_source_clean, LIMITS["utm_source"])
                 enforce_max_len("utm_medium", utm_medium_clean, LIMITS["utm_medium"])
 
+                # utm_source not requested as mandatory => keep as-is, but still include if present
+                utm_source_clean = slugify(utm_source, sep=sep) if utm_source else ""
+                if utm_source_clean:
+                    enforce_max_len("utm_source", utm_source_clean, LIMITS["utm_source"])
+
+                # utm_campaign REQUIRED => always equals campaignName
+                utm_campaign_val = campaign_name
+                if not utm_campaign_val:
+                    raise ValueError("utm_campaign is required but empty.")
+
                 params_all.update({
-                    "utm_source": utm_source_clean,
-                    "utm_medium": utm_medium_clean,
-                    "utm_campaign": campaign_name,
+                    "utm_medium": utm_medium_clean,     # REQUIRED
+                    "utm_campaign": utm_campaign_val,   # REQUIRED
                     "utm_content": utm_content,
                 })
+
+                # add utm_source only if present
+                if utm_source_clean:
+                    params_all["utm_source"] = utm_source_clean
 
             include_keys = set(MODES[mode]["include"])
             params = {k: v for k, v in params_all.items() if k in include_keys}
