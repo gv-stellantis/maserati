@@ -278,7 +278,7 @@ b1, b2 = st.columns(2)
 with b1: language = st.text_input("Language", placeholder="it / multil")
 with b2: yyyymm = st.text_input("Year_Month (YYYYMM)", value=yyyymm_now())
 
-if allow_media_builder:
+if mode == "Media":
     st.subheader("UTM_CONTENT (minimal)")
     phase = st.selectbox("Campaign phase", list(PHASE.keys()))
 else:
@@ -298,7 +298,7 @@ if st.button("Generate"):
         st.error("Salesforce Campaign ID * is required (used for campaignName and wtl_source).")
         st.stop()
 
-    if allow_media_builder and not utm_medium:
+   if mode == "Media" and not utm_medium:
         st.error("utm_medium * is required in this mode.")
         st.stop()
 
@@ -338,7 +338,7 @@ if st.button("Generate"):
                     parts.append(engine_token)     # ice / bev (or empty)
 
                 # Media details (optional)
-                if allow_media_builder:
+                if mode == "Media":
                     if format_val:
                         fmt = slugify(format_val, sep=sep)
                         enforce_max_len("Format", fmt, LIMITS["format"])
@@ -352,7 +352,7 @@ if st.button("Generate"):
                 utm_campaign_val = sep.join(parts)
 
             # utm_campaign REQUIRED in media modes
-            if allow_media_builder and not utm_campaign_val.strip():
+            if mode == "Media" and not utm_campaign_val.strip():
                 raise ValueError("utm_campaign * is required (fill campaign fields or use Override campaign name).")
 
             enforce_max_len("utm_campaign", utm_campaign_val, LIMITS["campaign_name"])
@@ -363,11 +363,11 @@ if st.button("Generate"):
                 enforce_max_len("utm_content", utm_content_val, LIMITS["utm_content"])
 
             # ---- UTM params ----
-            utm_medium_clean = slugify(utm_medium, sep=sep) if allow_media_builder else ""
+            utm_medium_clean = slugify(utm_medium, sep=sep) if mode == "Media" else ""
             if utm_medium_clean:
                 enforce_max_len("utm_medium", utm_medium_clean, LIMITS["utm_medium"])
 
-            utm_source_clean = slugify(utm_source, sep=sep) if (allow_media_builder and utm_source) else ""
+            utm_source_clean = slugify(utm_source, sep=sep) if (mode == "Media" and utm_source) else ""
             if utm_source_clean:
                 enforce_max_len("utm_source", utm_source_clean, LIMITS["utm_source"])
 
@@ -375,10 +375,10 @@ if st.button("Generate"):
             ordered_params = [
                 ("campaignName", campaignName_param),
                 ("wtl_source", wtl_source_param),
-                ("utm_medium", utm_medium_clean if allow_media_builder else ""),
-                ("utm_source", utm_source_clean if allow_media_builder else ""),
-                ("utm_campaign", utm_campaign_val if allow_media_builder else ""),
-                ("utm_content", utm_content_val if (allow_media_builder and utm_content_val) else ""),
+                ("utm_medium", utm_medium_clean if mode == "Media" else ""),
+                ("utm_source", utm_source_clean if mode == "Media" else ""),
+                ("utm_campaign", utm_campaign_val if mode == "Media" else ""),
+                ("utm_content", utm_content_val if (mode == "Media" and utm_content_val) else ""),
             ]
 
             # filter by mode include list
