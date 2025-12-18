@@ -10,7 +10,7 @@ LIMITS = {
     "wtl_source": 15,
     "utm_medium": 12,
     "utm_source": 10,
-    "campaign_name": 50,
+    "utm_campaign": 50,
     "utm_content": 20,
     "format": 25,
     "audience": 25,
@@ -23,108 +23,28 @@ MODES = {
     "Dealer":{"include": ["campaignName","wtl_source","utm_medium","utm_source","utm_campaign","utm_content"], "allow_media_details": False},
 }
 
-# UTM-only (kept separate)
+# UTM-only (kept separate from media details)
 UTM_MEDIUM = ["paid-search", "display", "email", "paid-social", "social-owned", "qr-code"]
+
 UTM_SOURCE = [
-    "edm",
-    "nl",
-    "adalliance",
-    "adbalancer",
-    "amobee",
-    "apex",
-    "askaprice",
-    "axelspring",
-    "autovia",
-    "baidu",
-    "bing",
-    "caraffinit",
-    "carkeys",
-    "clearchann",
-    "condenast",
-    "criteo",
-    "tiktok",
-    "drivek",
-    "dupontregi",
-    "esquire",
-    "facebook",
-    "forbes",
-    "gentleman",
-    "google",
-    "goop",
-    "gq",
-    "handelsbla",
-    "hearstauto",
-    "howtospend",
-    "iflytek",
-    "il",
-    "impactradi",
-    "innovid",
-    "instagram",
-    "internazio",
-    "iodonna",
-    "iqmedia",
-    "jiemian",
-    "kargo",
-    "kerv",
-    "leadscale",
-    "lefigaro",
-    "linkedin",
-    "livesystem",
-    "manzoni",
-    "meta",
-    "newyorktim",
-    "northwarre",
-    "ogury",
-    "precision",
-    "quattroruo",
-    "red",
-    "regit",
-    "sabato",
-    "strive",
-    "taboola",
-    "teads",
-    "thegoodlif",
-    "thetradede",
-    "topgear",
-    "twitter",
-    "uim",
-    "vanityfair",
-    "various",
-    "vogue",
-    "wallstreet",
-    "wangshangc",
-    "wechat",
-    "weibo",
-    "whatcar",
-    "wirtschaft",
-    "yahoo",
-    "yhouse",
-    "youtube",
-    "zeitmagazi",
-    "screenondemand",
-    "amazon",
-    "outbrain",
-    "sms",
-    "snapchat",
-    "elle",
-    "offline-platform",
-    "xing",
-    "tradedoubler",
-    "whatsapp",
-    "meetdeal",
-    "hbz",
-    "sz",
-    "seedtag"
+    "edm","nl","adalliance","adbalancer","amobee","apex","askaprice","axelspring","autovia",
+    "baidu","bing","caraffinit","carkeys","clearchann","condenast","criteo","tiktok","drivek",
+    "dupontregi","esquire","facebook","forbes","gentleman","google","goop","gq","handelsbla",
+    "hearstauto","howtospend","iflytek","il","impactradi","innovid","instagram","internazio",
+    "iodonna","iqmedia","jiemian","kargo","kerv","leadscale","lefigaro","linkedin","livesystem",
+    "manzoni","meta","newyorktim","northwarre","ogury","precision","quattroruo","red","regit",
+    "sabato","strive","taboola","teads","thegoodlif","thetradede","topgear","twitter","uim",
+    "vanityfair","various","vogue","wallstreet","wangshangc","wechat","weibo","whatcar",
+    "wirtschaft","yahoo","yhouse","youtube","zeitmagazi","screenondemand","amazon","outbrain",
+    "sms","snapchat","elle","offline-platform","xing","tradedoubler","whatsapp","meetdeal",
+    "hbz","sz","seedtag"
 ]
 
-
-# Media details (not UTM)
+# Media details (NOT UTM)
 TYPE_MEDIUM = ["Display", "Video", "Paid Search", "Paid Social"]
 
 PHASE = {"Awareness": "aw", "Consideration": "cns", "Conversion": "cnv"}
 
-# Model label -> token (exact output)
-# First entry "" to make the first option empty
 MODEL_OPTIONS = [
     ("", ""),  # empty first option
     ("Multi Model", "multim"),
@@ -137,13 +57,11 @@ MODEL_OPTIONS = [
     ("MC Pura Cielo", "mcpura-cielo"),
 ]
 
-# Engine label -> token (ONLY ICE / BEV) with empty first option
 ENGINE_OPTIONS = [
-    ("", ""),  # empty first option
+    ("", ""),  # empty / null
     ("ICE", "ice"),
     ("BEV", "bev"),
 ]
-
 
 FORMAT_BY_MEDIUM = {
     "Display": ["Standard", "Native", "Skin", "Interstitial"],
@@ -193,18 +111,15 @@ def merge_query_params_ordered(url: str, ordered_params: list[tuple[str, str]]) 
     existing = parse_qsl(p.query, keep_blank_values=True)
     keys_to_set = {k for (k, v) in ordered_params if v}
 
-    # keep existing params except the ones we will set (to avoid duplicates)
     kept = [(k, v) for (k, v) in existing if k not in keys_to_set]
-
-    # append new params in the requested order (only if value is not empty)
     appended = [(k, v) for (k, v) in ordered_params if v]
 
     new_query = urlencode(kept + appended, doseq=True)
     return urlunparse(p._replace(query=new_query))
 
-
-st.set_page_config(page_title="UTM Builder (Updated: Dic-2025)", layout="wide")
-st.title("UTM Builder (Updated: Dic-2025)")
+# ---------------- UI ----------------
+st.set_page_config(page_title="UTM Builder (Updated: Dec-2025)", layout="wide")
+st.title("UTM Builder (Updated: Dec-2025)")
 
 with st.sidebar:
     st.header("Settings")
@@ -215,11 +130,10 @@ allow_media_details = MODES[mode]["allow_media_details"]
 st.info(f"Current mode: **{mode}**")
 
 st.subheader("Salesforce ID")
-sf_campaign_id_raw = st.text_input("Salesforce Campaign ID* (15 chars)", placeholder="e.g. 701D0000000v4Gf")
+sf_campaign_id_raw = st.text_input("Salesforce Campaign ID * (15 chars)", placeholder="e.g. 701D0000000v4Gf")
 wtl_source_value = sf_campaign_id_raw.strip()
-st.text_input("WTL Source (auto = SF Campaign ID)", value=wtl_source_value, disabled=True)
+st.text_input("WTL Source (auto = Salesforce Campaign ID)", value=wtl_source_value, disabled=True)
 
-# ---- Vehicle (first option empty) ----
 st.subheader("Vehicle")
 colA, colB = st.columns(2)
 
@@ -231,23 +145,17 @@ with colA:
     model_token = model_map.get(model_label, "")
 
 with colB:
-    engine_label = st.selectbox(
-        "Engine",
-        [lbl for (lbl, _) in ENGINE_OPTIONS],
-        index=0
-    )
+    engine_label = st.selectbox("Engine", [lbl for (lbl, _) in ENGINE_OPTIONS], index=0)
     engine_token = engine_map.get(engine_label, "")
 
-
-# ---- UTM params (separate) ----
 st.subheader("UTM parameters")
 u1, u2 = st.columns(2)
 with u1:
-    utm_source = st.selectbox("utm_source", UTM_SOURCE)
+    utm_source = st.selectbox("utm_source *", UTM_SOURCE)
 with u2:
     utm_medium = st.selectbox("utm_medium *", UTM_MEDIUM)
 
-# ---- Media details (optional, first option empty) ----
+# Media details only for Media mode
 if mode == "Media":
     st.subheader("Media details (optional)")
     m1, m2, m3 = st.columns(3)
@@ -268,6 +176,7 @@ else:
 
 st.subheader("Campaign Name *")
 st.caption("Required – used to generate utm_campaign")
+
 a1, a2, a3, a4 = st.columns(4)
 with a1: region_dept = st.text_input("Region/Dept", placeholder="e.g. hq")
 with a2: camp_short = st.text_input("Name", placeholder="e.g. dstck")
@@ -278,28 +187,30 @@ b1, b2 = st.columns(2)
 with b1: language = st.text_input("Language", placeholder="it / multil")
 with b2: yyyymm = st.text_input("Year_Month (YYYYMM)", value=yyyymm_now())
 
-if mode == "Media":
-    st.subheader("UTM_CONTENT (minimal)")
-    phase = st.selectbox("Campaign phase", list(PHASE.keys()))
-else:
-    phase = "Awareness"
+st.subheader("UTM content (optional)")
+phase = st.selectbox("Campaign phase", list(PHASE.keys()))
 
-campaign_manual = st.text_input("Override campaign name (optional)")
+campaign_manual = st.text_input("Override utm_campaign (optional)")
 
-st.subheader("URLs (one per line)")
+st.subheader("URLs * (one per line)")
 urls_text = st.text_area("Paste URLs here", height=160)
 
+# ---------------- Generate ----------------
 if st.button("Generate"):
     urls = [u.strip() for u in urls_text.splitlines() if u.strip()]
     rows = []
 
-    # REQUIRED:
+    # REQUIRED FIELD VALIDATION
     if not sf_campaign_id_raw.strip():
         st.error("Salesforce Campaign ID * is required (used for campaignName and wtl_source).")
         st.stop()
 
-   if mode == "Media" and not utm_medium:
-        st.error("utm_medium * is required in this mode.")
+    if not utm_medium:
+        st.error("utm_medium * is required.")
+        st.stop()
+
+    if not utm_source:
+        st.error("utm_source * is required.")
         st.stop()
 
     if not urls:
@@ -311,14 +222,12 @@ if st.button("Generate"):
             sf_campaign_id = sf_campaign_id_raw.strip()
             enforce_max_len("Salesforce Campaign ID", sf_campaign_id, LIMITS["sf_campaign_id"])
 
-            # ---- FIX 1: campaignName is Salesforce ID ----
+            # campaignName + wtl_source = Salesforce ID
             campaignName_param = sf_campaign_id
-
-            # ---- FIX 2: wtl_source is Salesforce ID ----
             wtl_source_param = sf_campaign_id
+            enforce_max_len("WTL Source", wtl_source_param, LIMITS["wtl_source"])
 
-            # ---- Build utm_campaign from concatenated fields ----
-            # (this is what you previously called campaign_name)
+            # Build utm_campaign (concatenated)
             if campaign_manual.strip():
                 utm_campaign_val = slugify(campaign_manual, sep=sep)
             else:
@@ -331,13 +240,12 @@ if st.button("Generate"):
                     slugify(language, sep=sep),
                 ]
 
-                # Vehicle tokens (optional, only if selected)
                 if model_token:
-                    parts.append(model_token)      # exact token (multim, mcpura, mcpura-cielo)
+                    parts.append(model_token)
                 if engine_token:
-                    parts.append(engine_token)     # ice / bev (or empty)
+                    parts.append(engine_token)
 
-                # Media details (optional)
+                # Only in Media mode: add optional format/audience details
                 if mode == "Media":
                     if format_val:
                         fmt = slugify(format_val, sep=sep)
@@ -351,42 +259,38 @@ if st.button("Generate"):
                 parts = [p for p in parts if p and p != "n_a"]
                 utm_campaign_val = sep.join(parts)
 
-            # utm_campaign REQUIRED in media modes
-            if mode == "Media" and not utm_campaign_val.strip():
-                raise ValueError("utm_campaign * is required (fill campaign fields or use Override campaign name).")
+            if not utm_campaign_val.strip():
+                raise ValueError("utm_campaign * is required (fill campaign fields or use Override utm_campaign).")
 
-            enforce_max_len("utm_campaign", utm_campaign_val, LIMITS["campaign_name"])
+            enforce_max_len("utm_campaign", utm_campaign_val, LIMITS["utm_campaign"])
 
-            # utm_content only if available
-            utm_content_val = slugify(PHASE[phase], sep=sep) if phase else ""
+            # utm_content optional
+            utm_content_val = slugify(PHASE.get(phase, ""), sep=sep) if phase else ""
             if utm_content_val:
                 enforce_max_len("utm_content", utm_content_val, LIMITS["utm_content"])
 
-            # ---- UTM params ----
-            utm_medium_clean = slugify(utm_medium, sep=sep) if mode == "Media" else ""
-            if utm_medium_clean:
-                enforce_max_len("utm_medium", utm_medium_clean, LIMITS["utm_medium"])
+            # UTM params always included
+            utm_medium_clean = slugify(utm_medium, sep=sep)
+            enforce_max_len("utm_medium", utm_medium_clean, LIMITS["utm_medium"])
 
-            utm_source_clean = slugify(utm_source, sep=sep) if (mode == "Media" and utm_source) else ""
-            if utm_source_clean:
-                enforce_max_len("utm_source", utm_source_clean, LIMITS["utm_source"])
+            utm_source_clean = slugify(utm_source, sep=sep)
+            enforce_max_len("utm_source", utm_source_clean, LIMITS["utm_source"])
 
-            # ---- Build ordered param list (EXACT ORDER REQUIRED) ----
+            # Ordered params (exact order requested)
             ordered_params = [
                 ("campaignName", campaignName_param),
                 ("wtl_source", wtl_source_param),
-                ("utm_medium", utm_medium_clean if mode == "Media" else ""),
-                ("utm_source", utm_source_clean if mode == "Media" else ""),
-                ("utm_campaign", utm_campaign_val if mode == "Media" else ""),
-                ("utm_content", utm_content_val if (mode == "Media" and utm_content_val) else ""),
+                ("utm_medium", utm_medium_clean),
+                ("utm_source", utm_source_clean),
+                ("utm_campaign", utm_campaign_val),
+                ("utm_content", utm_content_val if utm_content_val else ""),
             ]
 
-            # filter by mode include list
+            # Keep only params relevant to mode (currently all modes include the same set)
             include_keys = set(MODES[mode]["include"])
-            ordered_params = [(k, v) for (k, v) in ordered_params if k in include_keys]
+            ordered_params = [(k, v) for (k, v) in ordered_params if (k in include_keys and v)]
 
             out = merge_query_params_ordered(u, ordered_params)
-
             rows.append({"Mode": mode, "Original URL": u, "Tagged URL": out})
 
         except Exception as e:
