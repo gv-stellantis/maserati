@@ -195,8 +195,8 @@ def merge_query_params(url: str, new_params: dict) -> str:
     q.update({k: v for k, v in new_params.items() if v})
     return urlunparse(p._replace(query=urlencode(q, doseq=True)))
 
-st.set_page_config(page_title="UTM Builder (Compliant + Optional Media Details)", layout="wide")
-st.title("UTM Builder (Compliant + Optional Media Details)")
+st.set_page_config(page_title="UTM Builder (Updated: Dic-2025)", layout="wide")
+st.title("UTM Builder (Updated: Dic-2025)")
 
 with st.sidebar:
     st.header("Settings")
