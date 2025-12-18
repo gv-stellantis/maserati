@@ -216,16 +216,13 @@ with colA:
     model_token = model_map.get(model_label, "")
 
 with colB:
-    # Build allowed engines based on selected model token
-    if model_token:
-        allowed_tokens = MODEL_ALLOWED_ENGINES.get(model_token, ["ice", "bev"])
-    else:
-        # if model is empty, show only empty engine (forces user to pick model first)
-        allowed_tokens = []
-
-    engine_labels = [lbl for (lbl, tok) in ENGINE_OPTIONS if (tok in allowed_tokens) or (tok == "")]
-    engine_label = st.selectbox("Engine", engine_labels, index=0)
+    engine_label = st.selectbox(
+        "Engine",
+        [lbl for (lbl, _) in ENGINE_OPTIONS],
+        index=0
+    )
     engine_token = engine_map.get(engine_label, "")
+
 
 # ---- UTM params (separate) ----
 if allow_media_builder:
