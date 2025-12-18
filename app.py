@@ -199,7 +199,7 @@ with st.sidebar:
 allow_media_builder = MODES[mode]["allow_media_builder"]
 st.info(f"Current mode: **{mode}**")
 
-st.subheader("Salesforce (base tracking)")
+st.subheader("Salesforce ID")
 sf_campaign_id_raw = st.text_input("Salesforce Campaign ID* (15 chars)", placeholder="e.g. 701D0000000v4Gf")
 wtl_source_value = sf_campaign_id_raw.strip()
 st.text_input("WTL Source (auto = SF Campaign ID)", value=wtl_source_value, disabled=True)
@@ -255,7 +255,7 @@ else:
     format_val = ""
     audience_val = ""
 
-st.subheader("Campaign Name * (unique cross-platform)")
+st.subheader("Campaign Name *")
 st.caption("Required – used to generate utm_campaign")
 a1, a2, a3, a4 = st.columns(4)
 with a1: region_dept = st.text_input("Region/Dept", placeholder="e.g. hq")
