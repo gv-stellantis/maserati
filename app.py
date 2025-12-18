@@ -144,13 +144,6 @@ ENGINE_OPTIONS = [
     ("BEV", "bev"),
 ]
 
-# Optional: restrict allowed engines per model
-# (Multi Model will default to both)
-MODEL_ALLOWED_ENGINES = {
-    "mc20": ["ice"],
-    "mcpura": ["ice"],
-    "mcpura-cielo": ["ice"],
-}
 
 FORMAT_BY_MEDIUM = {
     "Display": ["Standard", "Native", "Skin", "Interstitial"],
