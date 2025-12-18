@@ -17,10 +17,10 @@ LIMITS = {
 }
 
 MODES = {
-    "CRM": {"include": ["campaignName", "wtl_source"], "allow_media_builder": False},
-    "Media": {"include": ["campaignName", "wtl_source", "utm_source", "utm_medium", "utm_campaign", "utm_content"], "allow_media_builder": True},
-    "Social": {"include": ["campaignName", "wtl_source", "utm_source", "utm_medium", "utm_campaign", "utm_content"], "allow_media_builder": True},
-    "Dealer": {"include": ["campaignName", "wtl_source", "utm_source", "utm_medium", "utm_campaign", "utm_content"], "allow_media_builder": True},
+    "CRM":   {"include": ["campaignName","wtl_source","utm_medium","utm_source","utm_campaign","utm_content"], "allow_media_details": False},
+    "Media": {"include": ["campaignName","wtl_source","utm_medium","utm_source","utm_campaign","utm_content"], "allow_media_details": True},
+    "Social":{"include": ["campaignName","wtl_source","utm_medium","utm_source","utm_campaign","utm_content"], "allow_media_details": False},
+    "Dealer":{"include": ["campaignName","wtl_source","utm_medium","utm_source","utm_campaign","utm_content"], "allow_media_details": False},
 }
 
 # UTM-only (kept separate)
@@ -211,7 +211,7 @@ with st.sidebar:
     sep = st.selectbox("Word separator", ["_", "-"], index=0)
     mode = st.selectbox("Mode", list(MODES.keys()), index=1)
 
-allow_media_builder = MODES[mode]["allow_media_builder"]
+allow_media_details = MODES[mode]["allow_media_details"]
 st.info(f"Current mode: **{mode}**")
 
 st.subheader("Salesforce ID")
@@ -240,19 +240,15 @@ with colB:
 
 
 # ---- UTM params (separate) ----
-if allow_media_builder:
-    st.subheader("UTM parameters")
-    u1, u2 = st.columns(2)
-    with u1:
-        utm_source = st.selectbox("utm_source", UTM_SOURCE)
-    with u2:
-        utm_medium = st.selectbox("utm_medium*", UTM_MEDIUM)
-else:
-    utm_source = ""
-    utm_medium = ""
+st.subheader("UTM parameters")
+u1, u2 = st.columns(2)
+with u1:
+    utm_source = st.selectbox("utm_source", UTM_SOURCE)
+with u2:
+    utm_medium = st.selectbox("utm_medium *", UTM_MEDIUM)
 
 # ---- Media details (optional, first option empty) ----
-if allow_media_builder:
+if mode == "Media":
     st.subheader("Media details (optional)")
     m1, m2, m3 = st.columns(3)
     with m1:
