@@ -207,7 +207,7 @@ allow_media_builder = MODES[mode]["allow_media_builder"]
 st.info(f"Current mode: **{mode}**")
 
 st.subheader("Salesforce (base tracking)")
-sf_campaign_id_raw = st.text_input("Salesforce Campaign ID (15 chars)", placeholder="e.g. 701D0000000v4Gf")
+sf_campaign_id_raw = st.text_input("Salesforce Campaign ID* (15 chars)", placeholder="e.g. 701D0000000v4Gf")
 wtl_source_value = sf_campaign_id_raw.strip()
 st.text_input("WTL Source (auto = SF Campaign ID)", value=wtl_source_value, disabled=True)
 
@@ -241,7 +241,7 @@ if allow_media_builder:
     with u1:
         utm_source = st.selectbox("utm_source", UTM_SOURCE)
     with u2:
-        utm_medium = st.selectbox("utm_medium", UTM_MEDIUM)
+        utm_medium = st.selectbox("utm_medium*", UTM_MEDIUM)
 else:
     utm_source = ""
     utm_medium = ""
