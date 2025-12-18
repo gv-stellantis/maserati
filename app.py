@@ -265,7 +265,8 @@ else:
     format_val = ""
     audience_val = ""
 
-st.subheader("Campaign Name (unique cross-platform)")
+st.subheader("Campaign Name * (unique cross-platform)")
+st.caption("Required – used to generate utm_campaign")
 a1, a2, a3, a4 = st.columns(4)
 with a1: region_dept = st.text_input("Region/Dept", placeholder="e.g. hq")
 with a2: camp_short = st.text_input("Name", placeholder="e.g. dstck")
