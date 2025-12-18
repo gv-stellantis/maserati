@@ -5,7 +5,7 @@ import re
 import unicodedata
 from datetime import datetime
 
-# ========= LIMITS (da guida) =========
+# ========= LIMITS (from guide) =========
 LIMITS = {
     "sf_campaign_id": 15,
     "wtl_source": 15,
@@ -17,8 +17,8 @@ LIMITS = {
     "audience": 25,
 }
 
-# ========= MODALITÀ (CRM / Media / Social / Dealer) =========
-CHANNELS = {
+# ========= MODES (CRM / Media / Social / Dealer) =========
+MODES = {
     "CRM": {
         "include": ["campaignName", "wtl_source"],
         "allow_media_builder": False,
@@ -38,28 +38,43 @@ CHANNELS = {
 }
 
 # ========= DROPDOWNS =========
-# utm_medium (no spazi)
+# utm_medium (no spaces)
 UTM_MEDIUM = ["paid-search", "display", "email", "paid-social", "social-owned", "qr-code"]
 
-# Type-medium (canale media per scegliere format/audience)
+# Type-medium (media channel for format/audience)
 TYPE_MEDIUM = ["Display", "Video", "Paid Search", "Paid Social"]
 
-# Type-source (di fatto utm_source)
+# Type-source (also used as utm_source)
 UTM_SOURCE = ["newsletter", "facebook", "google", "instagram", "pinterest", "linkedin", "tiktok", "youtube"]
 
-# UTM content minimale (se vuoi reintrodurre targeting aw/cns/cnv + prs/rtg/geo lo facciamo dopo)
+# Minimal utm_content
 PHASE = {"Awareness": "aw", "Consideration": "cns", "Conversion": "cnv"}
 
-# Modelli/motorizzazioni bloccati (sostituisci con liste ufficiali)
-MODELS_ENGINES = {
-    "grecale": ["mhev", "bev", "phev"],
+# ========= MODELS / ENGINES (locked tokens) =========
+# Display label -> token (exact output)
+MODEL_OPTIONS = [
+    ("Grecale", "grecale"),
+    ("GranTurismo", "granturismo"),
+    ("Ghibli", "ghibli"),
+    ("Levante", "levante"),
+    ("MC20", "mc20"),
+    ("MC Pura", "mcpura"),
+    ("MC Pura Cielo", "mcpura-cielo"),
+]
+
+# Model token -> list of engine tokens
+# NOTE: replaced MHEV with BEV as requested
+MODEL_ENGINES = {
+    "grecale": ["bev", "phev"],
     "granturismo": ["bev", "ice"],
-    "ghibli": ["ice", "mhev"],
-    "levante": ["ice", "mhev"],
+    "ghibli": ["ice", "bev"],   # was mhev -> bev
+    "levante": ["ice", "bev"],  # was mhev -> bev
     "mc20": ["ice"],
+    "mcpura": ["ice"],
+    "mcpura-cielo": ["ice"],
 }
 
-# ========= FORMAT (colonna "Format Reviewed") =========
+# ========= FORMAT (Format Reviewed) =========
 FORMAT_BY_MEDIUM = {
     "Display": ["Standard", "Native", "Skin", "Interstitial"],
     "Video": ["Non-Skippable", "Skippable", "Bumper", "Short", "In-feed", "Masthead"],
@@ -67,7 +82,7 @@ FORMAT_BY_MEDIUM = {
     "Paid Social": ["Static Feed Ad", "Video Feed Ad", "Sponsered Content Ad", "Stories", "Reels", "Inmail"],
 }
 
-# ========= AUDIENCE (targeting) =========
+# ========= AUDIENCE (Targeting) =========
 AUDIENCE_BY_MEDIUM = {
     "Display": ["Prospecting", "Retargeting", "Look a Like"],
     "Video": ["Prospecting", "Retargeting", "Look a Like"],
@@ -94,7 +109,7 @@ def slugify(value: str, sep: str = "_") -> str:
 
 def enforce_max_len(label: str, value: str, max_len: int) -> str:
     if max_len and len(value) > max_len:
-        raise ValueError(f"{label} supera il limite ({len(value)}/{max_len}).")
+        raise ValueError(f"{label} exceeds the limit ({len(value)}/{max_len}).")
     return value
 
 def yyyymm_now() -> str:
@@ -103,7 +118,7 @@ def yyyymm_now() -> str:
 def merge_query_params(url: str, new_params: dict) -> str:
     p = urlparse(url.strip())
     if not p.scheme or not p.netloc:
-        raise ValueError("URL non valido (usa https://...)")
+        raise ValueError("Invalid URL (use https://...)")
     q = dict(parse_qsl(p.query, keep_blank_values=True))
     q.update({k: v for k, v in new_params.items() if v})
     return urlunparse(p._replace(query=urlencode(q, doseq=True)))
@@ -113,36 +128,37 @@ st.set_page_config(page_title="UTM Builder (Compliant + Format/Audience)", layou
 st.title("UTM Builder (Compliant + Format/Audience)")
 
 with st.sidebar:
-    st.header("Impostazioni")
-    sep = st.selectbox("Separatore", ["_", "-"], index=0)
-    mode = st.selectbox("Modalità", list(CHANNELS.keys()), index=1)  # Media default
+    st.header("Settings")
+    sep = st.selectbox("Word separator", ["_", "-"], index=0)
+    mode = st.selectbox("Mode", list(MODES.keys()), index=1)  # Media default
 
-allow_media_builder = CHANNELS[mode]["allow_media_builder"]
-st.info(f"Modalità: **{mode}**")
+allow_media_builder = MODES[mode]["allow_media_builder"]
+st.info(f"Current mode: **{mode}**")
 
 # ---- Salesforce block ----
-st.subheader("Salesforce (tracking base)")
-sf_campaign_id_raw = st.text_input("Salesforce Campaign ID (15 caratteri)", placeholder="Es. 701D0000000v4Gf")
+st.subheader("Salesforce (base tracking)")
+sf_campaign_id_raw = st.text_input("Salesforce Campaign ID (15 chars)", placeholder="e.g. 701D0000000v4Gf")
 wtl_source_value = sf_campaign_id_raw.strip()
 st.text_input("WTL Source (auto = SF Campaign ID)", value=wtl_source_value, disabled=True)
 
-# ---- Vehicle (bloccato) ----
-st.subheader("Veicolo")
-m1, m2 = st.columns(2)
-with m1:
-    model = st.selectbox("Modello", sorted(MODELS_ENGINES.keys()))
-with m2:
-    engine = st.selectbox("Motorizzazione", MODELS_ENGINES.get(model, []))
+# ---- Vehicle (locked) ----
+st.subheader("Vehicle")
+colA, colB = st.columns(2)
+with colA:
+    model_label = st.selectbox("Model", [x[0] for x in MODEL_OPTIONS])
+    model_token = dict(MODEL_OPTIONS)[model_label]  # exact output token
+with colB:
+    engine_token = st.selectbox("Engine", MODEL_ENGINES.get(model_token, []))
 
-# ---- Media Builder fields (solo in modalità allow_media_builder) ----
+# ---- Media Builder fields (only if enabled) ----
 if allow_media_builder:
-    st.subheader("UTM Builder Media (campi guidati)")
+    st.subheader("Media fields (guided)")
 
     c1, c2, c3 = st.columns(3)
     with c1:
         type_medium = st.selectbox("Type-medium", TYPE_MEDIUM)
     with c2:
-        type_source = st.selectbox("Type-source", UTM_SOURCE)  # usato anche come utm_source
+        type_source = st.selectbox("Type-source", UTM_SOURCE)  # also utm_source
     with c3:
         utm_medium = st.selectbox("utm_medium", UTM_MEDIUM)
 
@@ -159,32 +175,32 @@ else:
     audience_val = ""
 
 # ---- Campaign name inputs ----
-st.subheader("Campaign Name (unico cross-platform)")
+st.subheader("Campaign Name (unique cross-platform)")
 
 a1, a2, a3, a4 = st.columns(4)
-with a1: region_dept = st.text_input("Region/Dept", placeholder="es. hq")
-with a2: camp_short = st.text_input("Name", placeholder="es. dstck")
-with a3: activity = st.text_input("Activity type (objective)", placeholder="es. td")
-with a4: country = st.text_input("Country", placeholder="es. it")
+with a1: region_dept = st.text_input("Region/Dept", placeholder="e.g. hq")
+with a2: camp_short = st.text_input("Name", placeholder="e.g. dstck")
+with a3: activity = st.text_input("Activity type (objective)", placeholder="e.g. td")
+with a4: country = st.text_input("Country", placeholder="e.g. it")
 
 b1, b2 = st.columns(2)
 with b1: language = st.text_input("Language", placeholder="it / multil")
 with b2: yyyymm = st.text_input("Year_Month (YYYYMM)", value=yyyymm_now())
 
 if allow_media_builder:
-    st.subheader("UTM_CONTENT (minimo)")
+    st.subheader("UTM_CONTENT (minimal)")
     phase = st.selectbox("Campaign phase", list(PHASE.keys()))
 else:
     phase = "Awareness"
 
-campaign_manual = st.text_input("Override campaign name (opzionale)")
+campaign_manual = st.text_input("Override campaign name (optional)")
 
 # ---- URLs ----
-st.subheader("URL (uno per riga)")
-urls_text = st.text_area("Incolla qui gli URL", height=160)
+st.subheader("URLs (one per line)")
+urls_text = st.text_area("Paste URLs here", height=160)
 
 # ========= GENERATION =========
-if st.button("Genera"):
+if st.button("Generate"):
     urls = [u.strip() for u in urls_text.splitlines() if u.strip()]
     rows = []
 
@@ -207,8 +223,11 @@ if st.button("Genera"):
                     slugify(country, sep=sep),
                     slugify(yyyymm, sep=sep),
                     slugify(language, sep=sep),
-                    slugify(model, sep=sep),
-                    slugify(engine, sep=sep),
+
+                    # IMPORTANT: model token must be exact (mcpura / mcpura-cielo), so we do not slugify it
+                    model_token,
+                    # engine token is already controlled, keep as-is
+                    engine_token,
                 ]
 
                 # ---- Media enrichment: AFTER type-source add format + audience ----
@@ -221,8 +240,8 @@ if st.button("Genera"):
                     parts.extend([
                         slugify(type_medium, sep=sep),
                         slugify(type_source, sep=sep),  # Type-source
-                        fmt,                             # NEW: Format (after type-source)
-                        aud,                             # NEW: Audience (after type-source)
+                        fmt,                             # Format (after type-source)
+                        aud,                             # Audience (after type-source)
                     ])
 
                 parts = [p for p in parts if p and p != "n_a"]
@@ -230,17 +249,17 @@ if st.button("Genera"):
 
             enforce_max_len("Campaign name", campaign_name, LIMITS["campaign_name"])
 
-            # UTM content minimale
+            # Minimal utm_content
             utm_content = slugify(PHASE[phase], sep=sep)
             enforce_max_len("utm_content", utm_content, LIMITS["utm_content"])
 
-            # Params base (sempre)
+            # Params base (always)
             params_all = {
                 "campaignName": campaign_name,
                 "wtl_source": wtl_source,
             }
 
-            # UTM params only if in media modes
+            # UTM params only if media modes
             if allow_media_builder:
                 utm_source_clean = slugify(type_source, sep=sep)  # type-source = utm_source
                 utm_medium_clean = slugify(utm_medium, sep=sep)
@@ -256,19 +275,19 @@ if st.button("Genera"):
                 })
 
             # Filter by mode
-            include_keys = set(CHANNELS[mode]["include"])
+            include_keys = set(MODES[mode]["include"])
             params = {k: v for k, v in params_all.items() if k in include_keys}
 
             out = merge_query_params(u, params)
-            rows.append({"Modalità": mode, "URL originale": u, "URL con tracking": out})
+            rows.append({"Mode": mode, "Original URL": u, "Tagged URL": out})
 
         except Exception as e:
-            rows.append({"Modalità": mode, "URL originale": u, "URL con tracking": f"ERRORE: {e}"})
+            rows.append({"Mode": mode, "Original URL": u, "Tagged URL": f"ERROR: {e}"})
 
     df = pd.DataFrame(rows)
     st.dataframe(df, use_container_width=True)
     st.download_button(
-        "Scarica CSV",
+        "Download CSV",
         data=df.to_csv(index=False).encode("utf-8"),
         file_name="utm_output.csv",
         mime="text/csv",
